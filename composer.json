@@ -1,0 +1,20 @@
+{
+  "name": "gaoyang/aliyun-core",
+  "description": "Aliyun SDK for PHP",
+  "keywords": [ "aliyun", "sdk" ],
+  "type": "library",
+  "license": "MIT",
+  "homepage": "https://www.aliyun.com",
+  "authors": [
+    {
+      "name": "gaoyang"
+    }
+  ],
+  "require": {},
+  "minimum-stability": "stable",
+  "autoload": {
+    "psr-4": {
+      "Aliyun\\Core\\": "src"
+    }
+  }
+}
