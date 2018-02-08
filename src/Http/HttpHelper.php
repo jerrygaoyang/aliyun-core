@@ -26,16 +26,18 @@ class HttpHelper
     public static $connectTimeout = 30;//30 second
     public static $readTimeout = 80;//80 second
 
+    /**
+     * @param $url
+     * @param string $httpMethod
+     * @param null $postFields
+     * @param null $headers
+     * @return HttpResponse
+     * @throws ClientException
+     */
     public static function curl($url, $httpMethod = "GET", $postFields = null, $headers = null)
     {
         $ch = curl_init();
         curl_setopt($ch, CURLOPT_CUSTOMREQUEST, $httpMethod);
-        if (ENABLE_HTTP_PROXY) {
-            curl_setopt($ch, CURLOPT_PROXYAUTH, CURLAUTH_BASIC);
-            curl_setopt($ch, CURLOPT_PROXY, HTTP_PROXY_IP);
-            curl_setopt($ch, CURLOPT_PROXYPORT, HTTP_PROXY_PORT);
-            curl_setopt($ch, CURLOPT_PROXYTYPE, CURLPROXY_HTTP);
-        }
         curl_setopt($ch, CURLOPT_URL, $url);
         curl_setopt($ch, CURLOPT_FAILONERROR, false);
         curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);

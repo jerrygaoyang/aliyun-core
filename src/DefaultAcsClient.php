@@ -38,7 +38,17 @@ class DefaultAcsClient implements IAcsClient
         $this->__urlTestFlag__ = false;
         $this->locationService = new LocationService($this->iClientProfile);
     }
-    
+
+    /**
+     * @param $request
+     * @param null $iSigner
+     * @param null $credential
+     * @param bool $autoRetry
+     * @param int $maxRetryNumber
+     * @return mixed|\SimpleXMLElement
+     * @throws ClientException
+     * @throws ServerException
+     */
     public function getAcsResponse($request, $iSigner = null, $credential = null, $autoRetry = true, $maxRetryNumber = 3)
     {
         $httpResponse = $this->doActionImpl($request, $iSigner, $credential, $autoRetry, $maxRetryNumber);
@@ -49,6 +59,15 @@ class DefaultAcsClient implements IAcsClient
         return $respObject;
     }
 
+    /**
+     * @param $request
+     * @param null $iSigner
+     * @param null $credential
+     * @param bool $autoRetry
+     * @param int $maxRetryNumber
+     * @return Http\HttpResponse
+     * @throws ClientException
+     */
     private function doActionImpl($request, $iSigner = null, $credential = null, $autoRetry = true, $maxRetryNumber = 3)
     {
         if (null == $this->iClientProfile && (null == $iSigner || null == $credential
@@ -102,7 +121,16 @@ class DefaultAcsClient implements IAcsClient
         }
         return $httpResponse;
     }
-    
+
+    /**
+     * @param $request
+     * @param null $iSigner
+     * @param null $credential
+     * @param bool $autoRetry
+     * @param int $maxRetryNumber
+     * @return Http\HttpResponse
+     * @throws ClientException
+     */
     public function doAction($request, $iSigner = null, $credential = null, $autoRetry = true, $maxRetryNumber = 3)
     {
         trigger_error("doAction() is deprecated. Please use getAcsResponse() instead.", E_USER_NOTICE);
@@ -122,8 +150,13 @@ class DefaultAcsClient implements IAcsClient
         }
         return $request;
     }
-    
-    
+
+
+    /**
+     * @param $respObject
+     * @param $httpStatus
+     * @throws ServerException
+     */
     private function buildApiException($respObject, $httpStatus)
     {
         throw new ServerException($respObject->Message, $respObject->Code, $httpStatus, $respObject->RequestId);
