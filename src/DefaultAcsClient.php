@@ -1,53 +1,97 @@
 <?php
-
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing,
+ * software distributed under the License is distributed on an
+ * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+ * KIND, either express or implied.  See the License for the
+ * specific language governing permissions and limitations
+ * under the License.
+ */
 namespace Aliyun\Core;
+
 use Aliyun\Core\Exception\ClientException;
 use Aliyun\Core\Exception\ServerException;
-use Aliyun\Core\Regions\EndpointProvider;
 use Aliyun\Core\Http\HttpHelper;
+use Aliyun\Core\Regions\EndpointProvider;
+use Aliyun\Core\Regions\LocationService;
 
-class DefaultAcsClient implements IAcsClient 
-{    
+class DefaultAcsClient implements IAcsClient
+{
     public $iClientProfile;
     public $__urlTestFlag__;
+    private $locationService;
     
-    function  __construct($iClientProfile)
+    public function __construct($iClientProfile)
     {
         $this->iClientProfile = $iClientProfile;
         $this->__urlTestFlag__ = false;
+        $this->locationService = new LocationService($this->iClientProfile);
     }
-    
+
+    /**
+     * @param $request
+     * @param null $iSigner
+     * @param null $credential
+     * @param bool $autoRetry
+     * @param int $maxRetryNumber
+     * @return mixed|\SimpleXMLElement
+     * @throws ClientException
+     */
     public function getAcsResponse($request, $iSigner = null, $credential = null, $autoRetry = true, $maxRetryNumber = 3)
     {
         $httpResponse = $this->doActionImpl($request, $iSigner, $credential, $autoRetry, $maxRetryNumber);
         $respObject = $this->parseAcsResponse($httpResponse->getBody(), $request->getAcceptFormat());
-        if(false == $httpResponse->isSuccess())
-        {
+        if (false == $httpResponse->isSuccess()) {
             $this->buildApiException($respObject, $httpResponse->getStatus());
         }
         return $respObject;
     }
 
+    /**
+     * @param $request
+     * @param null $iSigner
+     * @param null $credential
+     * @param bool $autoRetry
+     * @param int $maxRetryNumber
+     * @return mixed
+     * @throws ClientException
+     */
     private function doActionImpl($request, $iSigner = null, $credential = null, $autoRetry = true, $maxRetryNumber = 3)
-    {    
-        if(null == $this->iClientProfile && (null == $iSigner || null == $credential 
-            || null == $request->getRegionId() || null == $request->getAcceptFormat()))
-        {
+    {
+        if (null == $this->iClientProfile && (null == $iSigner || null == $credential
+            || null == $request->getRegionId() || null == $request->getAcceptFormat())) {
             throw new ClientException("No active profile found.", "SDK.InvalidProfile");
         }
-        if(null == $iSigner)
-        {
+        if (null == $iSigner) {
             $iSigner = $this->iClientProfile->getSigner();
         }
-        if(null == $credential)
-        {
+        if (null == $credential) {
             $credential = $this->iClientProfile->getCredential();
         }
         $request = $this->prepareRequest($request);
-        $domain = EndpointProvider::findProductDomain($request->getRegionId(), $request->getProduct());
 
-        if(null == $domain)
+        // Get the domain from the Location Service by speicified `ServiceCode` and `RegionId`.
+        $domain = null;
+        if (null != $request->getLocationServiceCode())
         {
+            $domain = $this->locationService->findProductDomain($request->getRegionId(), $request->getLocationServiceCode(), $request->getLocationEndpointType(), $request->getProduct());
+        }       
+        if ($domain == null)
+        {
+            $domain = EndpointProvider::findProductDomain($request->getRegionId(), $request->getProduct());
+        }
+
+        if (null == $domain) {
             throw new ClientException("Can not find endpoint to access.", "SDK.InvalidRegionId");
         }
         $requestUrl = $request->composeUrl($iSigner, $credential, $domain);
@@ -56,17 +100,17 @@ class DefaultAcsClient implements IAcsClient
             throw new ClientException($requestUrl, "URLTestFlagIsSet");
         }
 
-        if(count($request->getDomainParameter())>0){
+        if (count($request->getDomainParameter())>0) {
             $httpResponse = HttpHelper::curl($requestUrl, $request->getMethod(), $request->getDomainParameter(), $request->getHeaders());
         } else {
-            $httpResponse = HttpHelper::curl($requestUrl, $request->getMethod(),$request->getContent(), $request->getHeaders());
+            $httpResponse = HttpHelper::curl($requestUrl, $request->getMethod(), $request->getContent(), $request->getHeaders());
         }
         
         $retryTimes = 1;
         while (500 <= $httpResponse->getStatus() && $autoRetry && $retryTimes < $maxRetryNumber) {
-            $requestUrl = $request->composeUrl($iSigner, $credential,$domain);
-            
-            if(count($request->getDomainParameter())>0){
+            $requestUrl = $request->composeUrl($iSigner, $credential, $domain);
+
+            if (count($request->getDomainParameter())>0) {
                 $httpResponse = HttpHelper::curl($requestUrl, $request->getDomainParameter(), $request->getHeaders());
             } else {
                 $httpResponse = HttpHelper::curl($requestUrl, $request->getMethod(), $request->getContent(), $request->getHeaders());
@@ -75,31 +119,42 @@ class DefaultAcsClient implements IAcsClient
         }
         return $httpResponse;
     }
-    
+
+    /**
+     * @param $request
+     * @param null $iSigner
+     * @param null $credential
+     * @param bool $autoRetry
+     * @param int $maxRetryNumber
+     * @return mixed
+     * @throws ClientException
+     */
     public function doAction($request, $iSigner = null, $credential = null, $autoRetry = true, $maxRetryNumber = 3)
-    {    
+    {
         trigger_error("doAction() is deprecated. Please use getAcsResponse() instead.", E_USER_NOTICE);
         return $this->doActionImpl($request, $iSigner, $credential, $autoRetry, $maxRetryNumber);
     }
     
     private function prepareRequest($request)
     {
-        if(null == $request->getRegionId())
-        {
+        if (null == $request->getRegionId()) {
             $request->setRegionId($this->iClientProfile->getRegionId());
         }
-        if(null == $request->getAcceptFormat())
-        {
+        if (null == $request->getAcceptFormat()) {
             $request->setAcceptFormat($this->iClientProfile->getFormat());
         }
-        if(null == $request->getMethod())
-        {
+        if (null == $request->getMethod()) {
             $request->setMethod("GET");
         }
         return $request;
     }
-    
-    
+
+
+    /**
+     * @param $respObject
+     * @param $httpStatus
+     * @throws ServerException
+     */
     private function buildApiException($respObject, $httpStatus)
     {
         throw new ServerException($respObject->Message, $respObject->Code, $httpStatus, $respObject->RequestId);
@@ -107,16 +162,11 @@ class DefaultAcsClient implements IAcsClient
     
     private function parseAcsResponse($body, $format)
     {
-        if ("JSON" == $format)
-        {    
+        if ("JSON" == $format) {
             $respObject = json_decode($body);
-        }
-        else if("XML" == $format)
-        {
+        } elseif ("XML" == $format) {
             $respObject = @simplexml_load_string($body);
-        }
-        else if("RAW" == $format)
-        {
+        } elseif ("RAW" == $format) {
             $respObject = $body;
         }
         return $respObject;

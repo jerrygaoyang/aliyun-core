@@ -15,7 +15,7 @@ class Client
     public static function init($accessKeyId, $accessKeySecret, $region, $options = [])
     {
         // 加载区域结点配置
-        Config::load();
+        Autoload::config();
 
         // 初始化acsClient,暂不支持region化
         $profile = DefaultProfile::getProfile($region, $accessKeyId, $accessKeySecret);

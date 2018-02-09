@@ -1,12 +1,30 @@
 <?php
-
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing,
+ * software distributed under the License is distributed on an
+ * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+ * KIND, either express or implied.  See the License for the
+ * specific language governing permissions and limitations
+ * under the License.
+ */
 namespace Aliyun\Core\Profile;
 
 use Aliyun\Core\Auth\Credential;
 use Aliyun\Core\Auth\ShaHmac1Signer;
-use Aliyun\Core\Regions\ProductDomain;
 use Aliyun\Core\Regions\Endpoint;
 use Aliyun\Core\Regions\EndpointProvider;
+use Aliyun\Core\Regions\LocationService;
+use Aliyun\Core\Regions\ProductDomain;
 
 class DefaultProfile implements IClientProfile
 {
@@ -25,9 +43,9 @@ class DefaultProfile implements IClientProfile
 	    self::$credential = $credential;
 	}
 	
-	public static function getProfile($regionId, $accessKeyId, $accessSecret)
+	public static function getProfile($regionId, $accessKeyId, $accessSecret, $securityToken = null)
 	{
-		$credential =new Credential($accessKeyId, $accessSecret);
+		$credential =new Credential($accessKeyId, $accessSecret, $securityToken);
 		self::$profile = new DefaultProfile($regionId, $credential);
 		return self::$profile;
 	}
@@ -84,6 +102,8 @@ class DefaultProfile implements IClientProfile
 		{
 			self::updateEndpoint($regionId, $product, $domain, $endpoint);
 		}
+
+		LocationService::addEndPoint($regionId, $product, $domain);
 	}
 	
 	public static function findEndpointByName($endpointName)
@@ -100,8 +120,8 @@ class DefaultProfile implements IClientProfile
 	private static function addEndpoint_($endpointName,$regionId, $product, $domain)
 	{
 		$regionIds = array($regionId);
-		$productDomains = array(new ProductDomain($product, $domain));
-		$endpoint = new Endpoint($endpointName, $regionIds, $productDomains);
+		$productsDomains = array(new ProductDomain($product, $domain));
+		$endpoint = new Endpoint($endpointName, $regionIds, $productsDomains);
 		array_push(self::$endpoints, $endpoint);
 	}
 	
@@ -114,24 +134,22 @@ class DefaultProfile implements IClientProfile
 			$endpoint->setRegionIds($regionIds);
 		}
 
-		$productDomains = $endpoint->getProductDomains();
-		if(null == self::findProductDomain($productDomains, $product, $domain))
-		{
-		 	array_push($productDomains, new ProductDomain($product, $domain));	
-		}
-		$endpoint->setProductDomains($productDomains);
-	}
-	
-	private static function findProductDomain($productDomains, $product, $domain)
-	{
-		foreach ($productDomains as $key => $productDomain)
-		{
-			if($productDomain->getProductName() == $product && $productDomain->getDomainName() == $domain)
-			{
-				return $productDomain;
-			}
-		}
-		return null;
-	}
+        $productDomains = $endpoint->getProductDomains();
+        if (null == self::findProductDomainAndUpdate($productDomains, $product, $domain)) {
+            array_push($productDomains, new ProductDomain($product, $domain));
+        }
 
+        $endpoint->setProductDomains($productDomains);
+    }
+    
+    private static function findProductDomainAndUpdate($productDomains, $product, $domain)
+    {
+        foreach ($productDomains as $key => $productDomain) {
+            if ($productDomain->getProductName() == $product) {
+                $productDomain->setDomainName($domain);
+                return $productDomain;
+            }
+        }
+        return null;
+    }
 }
